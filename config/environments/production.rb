@@ -1,3 +1,5 @@
+ENV['SECRET_TOKEN']="d4d13d574aeb9ddb43c75ac1e506d499a633f4f4b206aa59c0b1bb8bae7be14a"
+
 Discourse::Application.configure do
   # Settings specified here will take precedence over those in config/application.rb
 
@@ -39,8 +41,8 @@ Discourse::Application.configure do
 
     config.action_mailer.smtp_settings = settings.reject{|_, y| y.nil?}
   else
-    config.action_mailer.delivery_method = :sendmail
-    config.action_mailer.sendmail_settings = {arguments: '-i'}
+    #config.action_mailer.delivery_method = :sendmail
+    #config.action_mailer.sendmail_settings = {arguments: '-i'}
   end
 
   # Send deprecation notices to registered listeners

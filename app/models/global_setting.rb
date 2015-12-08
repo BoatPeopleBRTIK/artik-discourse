@@ -38,6 +38,7 @@ class GlobalSetting
     @config ||=
       begin
         c = {}
+        c[:path] = redis_path if redis_path
         c[:host] = redis_host if redis_host
         c[:port] = redis_port if redis_port
         c[:password] = redis_password if redis_password.present?

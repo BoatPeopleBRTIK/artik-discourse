@@ -109,7 +109,7 @@ group :test, :development do
   gem 'listen', '0.7.3', require: false
   gem 'certified', require: false
   # later appears to break Fabricate(:topic, category: category)
-  gem 'fabrication', '2.9.8', require: false
+  #gem 'fabrication', '2.9.8', require: false
   gem 'discourse-qunit-rails', require: 'qunit-rails'
   gem 'mocha', require: false
   gem 'rb-fsevent', require: RUBY_PLATFORM =~ /darwin/i ? 'rb-fsevent' : false
@@ -129,7 +129,7 @@ group :development do
   gem 'better_errors'
   gem 'binding_of_caller'
   gem 'librarian', '>= 0.0.25', require: false
-  gem 'annotate'
+  #gem 'annotate'
   gem 'foreman', require: false
 end
 
@@ -150,8 +150,8 @@ gem 'htmlentities', require: false
 gem 'flamegraph', require: false
 gem 'rack-mini-profiler', require: false
 
-gem 'unicorn', require: false
-gem 'puma', require: false
+#gem 'unicorn', require: false
+#gem 'puma', require: false
 gem 'rbtrace', require: false, platform: :mri
 
 # required for feed importing and embedding
