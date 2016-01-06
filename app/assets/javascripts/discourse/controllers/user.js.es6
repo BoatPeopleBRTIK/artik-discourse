@@ -6,7 +6,6 @@ import User from 'discourse/models/user';
 
 export default Ember.Controller.extend(CanCheckEmails, {
   indexStream: false,
-  pmView: false,
   userActionType: null,
   needs: ['user-notifications', 'user-topics-list'],
 
@@ -28,11 +27,19 @@ export default Ember.Controller.extend(CanCheckEmails, {
   },
 
   @computed('viewingSelf', 'currentUser.admin')
-  canSeePrivateMessages(viewingSelf, isAdmin) {
+  showBookmarks(viewingSelf, isAdmin) {
+    return viewingSelf || isAdmin;
+  },
+
+  @computed('viewingSelf', 'currentUser.admin')
+  showPrivateMessages(viewingSelf, isAdmin) {
     return this.siteSettings.enable_private_messages && (viewingSelf || isAdmin);
   },
 
-  canSeeNotificationHistory: Em.computed.alias('canSeePrivateMessages'),
+  @computed('viewingSelf', 'currentUser.staff')
+  showNotificationsTab(viewingSelf, staff) {
+    return viewingSelf || staff;
+  },
 
   @computed("content.badge_count")
   showBadges(badgeCount) {
@@ -44,6 +51,12 @@ export default Ember.Controller.extend(CanCheckEmails, {
     return (userActionType === UserAction.TYPES.messages_sent) ||
            (userActionType === UserAction.TYPES.messages_received);
   },
+
+  @computed("indexStream", "userActionType")
+  showActionTypeSummary(indexStream,userActionType, showPMs) {
+    return (indexStream || userActionType) && !showPMs;
+  },
+
 
   @computed()
   canInviteToForum() {
@@ -63,11 +76,6 @@ export default Ember.Controller.extend(CanCheckEmails, {
       }).compact();
     }
   },
-
-  privateMessagesActive: Em.computed.equal('pmView', 'index'),
-  privateMessagesMineActive: Em.computed.equal('pmView', 'mine'),
-  privateMessagesUnreadActive: Em.computed.equal('pmView', 'unread'),
-  privateMessagesGroupsActive: Em.computed.equal('pmView', 'groups'),
 
   actions: {
     expandProfile() {

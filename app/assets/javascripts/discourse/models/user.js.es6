@@ -16,7 +16,6 @@ const User = RestModel.extend({
   hasPMs: Em.computed.gt("private_messages_stats.all", 0),
   hasStartedPMs: Em.computed.gt("private_messages_stats.mine", 0),
   hasUnreadPMs: Em.computed.gt("private_messages_stats.unread", 0),
-  hasGroupsPMs: Em.computed.gt("private_messages_stats.groups", 0),
   hasPosted: Em.computed.gt("post_count", 0),
   hasNotPosted: Em.computed.not("hasPosted"),
   canBeDeleted: Em.computed.and("can_be_deleted", "hasNotPosted"),
@@ -200,6 +199,15 @@ const User = RestModel.extend({
            ua.action_type === UserAction.TYPES.topics;
   },
 
+  @computed("groups.@each")
+  displayGroups() {
+    const groups = this.get('groups');
+    const filtered = groups.filter(group => {
+      return !group.automatic || group.name === "moderators";
+    });
+    return filtered.length === 0 ? null : filtered;
+  },
+
   // The user's stat count, excluding PMs.
   @computed("statsExcludingPms.@each.count")
   statsCountNonPM() {
@@ -234,8 +242,8 @@ const User = RestModel.extend({
         }));
       }
 
-      if (!Em.isEmpty(json.user.custom_groups)) {
-        json.user.custom_groups = json.user.custom_groups.map(g => Group.create(g));
+      if (!Em.isEmpty(json.user.groups)) {
+        json.user.groups = json.user.groups.map(g => Group.create(g));
       }
 
       if (json.user.invited_by) {
