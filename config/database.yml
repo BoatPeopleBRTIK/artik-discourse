@@ -23,6 +23,7 @@ test:
   timeout: 5000
   host_names:
     - "ec2-54-193-28-118.us-west-1.compute.amazonaws.com"
+  prepared_statements: false
 
 # profile db is used for benchmarking using the script/bench.rb script
 profile:
