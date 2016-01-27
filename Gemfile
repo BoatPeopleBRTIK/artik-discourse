@@ -204,3 +204,7 @@ group :profile do
   # if you need to profile, uncomment out this line
   # gem 'rack-perftools_profiler', require: 'rack/perftools_profiler', platform: :mri_19
 end
+
+# manual addition for now to get assets to build
+# https://meta.discourse.org/t/missing-gemfile-entry-for-sprockets/33645
+gem 'sprockets', '~> 2.11.0'
