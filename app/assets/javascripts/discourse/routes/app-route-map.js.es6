@@ -1,3 +1,5 @@
+import { defaultHomepage } from 'discourse/lib/utilities';
+
 export default function() {
   // Error page
   this.route('exception', { path: '/exception' });
@@ -45,24 +47,27 @@ export default function() {
     this.route('categoryWithID', { path: '/c/:parentSlug/:slug/:id' });
 
     // homepage
-    this.route(Discourse.Utilities.defaultHomepage(), { path: '/' });
+    this.route(defaultHomepage(), { path: '/' });
   });
 
   this.resource('group', { path: '/groups/:name' }, function() {
+    this.route('members');
+    this.route('posts');
     this.route('topics');
     this.route('mentions');
-    this.route('members');
     this.route('messages');
   });
 
   // User routes
   this.resource('users');
   this.resource('user', { path: '/users/:username' }, function() {
+    this.route('summary');
     this.resource('userActivity', { path: '/activity' }, function() {
       this.route('topics');
       this.route('replies');
       this.route('likesGiven', {path: 'likes-given'});
       this.route('bookmarks');
+      this.route('pending');
     });
 
     this.resource('userNotifications', {path: '/notifications'}, function(){
@@ -116,4 +121,20 @@ export default function() {
   this.resource('queued-posts', { path: '/queued-posts' });
 
   this.route('full-page-search', {path: '/search'});
+
+  this.resource('tags', function() {
+    this.route('show', {path: '/:tag_id'});
+    this.route('showCategory', {path: '/c/:category/:tag_id'});
+    this.route('showParentCategory', {path: '/c/:parent_category/:category/:tag_id'});
+
+    Discourse.Site.currentProp('filters').forEach(filter => {
+      this.route('show' + filter.capitalize(), {path: '/:tag_id/l/' + filter});
+      this.route('showCategory' + filter.capitalize(), {path: '/c/:category/:tag_id/l/' + filter});
+      this.route('showParentCategory' + filter.capitalize(), {path: '/c/:parent_category/:category/:tag_id/l/' + filter});
+    });
+  });
+
+  this.resource('tagGroups', {path: '/tag_groups'}, function() {
+    this.route('show', {path: '/:id'});
+  });
 }

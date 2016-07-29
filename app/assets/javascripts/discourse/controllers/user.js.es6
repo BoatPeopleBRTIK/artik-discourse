@@ -1,4 +1,3 @@
-import { exportUserArchive } from 'discourse/lib/export-csv';
 import CanCheckEmails from 'discourse/mixins/can-check-emails';
 import computed from 'ember-addons/ember-computed-decorators';
 import UserAction from 'discourse/models/user-action';
@@ -7,7 +6,8 @@ import User from 'discourse/models/user';
 export default Ember.Controller.extend(CanCheckEmails, {
   indexStream: false,
   userActionType: null,
-  needs: ['user-notifications', 'user-topics-list'],
+  needs: ['application','user-notifications', 'user-topics-list'],
+  currentPath: Em.computed.alias('controllers.application.currentPath'),
 
   @computed("content.username")
   viewingSelf(username) {
@@ -41,7 +41,12 @@ export default Ember.Controller.extend(CanCheckEmails, {
     return viewingSelf || staff;
   },
 
-  @computed("content.badge_count")
+  @computed('model.name')
+  nameFirst(name) {
+    return !this.get('siteSettings.prioritize_username_in_ux') && name && name.trim().length > 0;
+  },
+
+  @computed("model.badge_count")
   showBadges(badgeCount) {
     return Discourse.SiteSettings.enable_badges && badgeCount > 0;
   },
@@ -71,6 +76,7 @@ export default Ember.Controller.extend(CanCheckEmails, {
     if (!Ember.isEmpty(siteUserFields)) {
       const userFields = this.get('model.user_fields');
       return siteUserFields.filterProperty('show_on_profile', true).sortBy('position').map(field => {
+        field.dasherized_name = field.get('name').dasherize();
         const value = userFields ? userFields[field.get('id').toString()] : null;
         return Ember.isEmpty(value) ? null : Ember.Object.create({ value, field });
       }).compact();
@@ -85,21 +91,8 @@ export default Ember.Controller.extend(CanCheckEmails, {
     adminDelete() {
       // I really want this deferred, don't want to bring in all this code till used
       const AdminUser = require('admin/models/admin-user').default;
-      AdminUser.find(this.get('model.username').toLowerCase())
-                         .then(user => user.destroy({deletePosts: true}));
+      AdminUser.find(this.get('model.id')).then(user => user.destroy({deletePosts: true}));
     },
 
-    exportUserArchive() {
-      bootbox.confirm(
-        I18n.t("admin.export_csv.user_archive_confirm"),
-        I18n.t("no_value"),
-        I18n.t("yes_value"),
-        function(confirmed) {
-          if (confirmed) {
-            exportUserArchive();
-          }
-        }
-      );
-    }
   }
 });

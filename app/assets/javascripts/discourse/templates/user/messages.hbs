@@ -1,5 +1,11 @@
 <section class='user-navigation'>
-  <ul class='action-list nav-stacked'>
+  {{#unless site.mobileView}}
+    {{#if showNewPM}}
+      {{d-button class="btn-primary new-private-message" action="composePrivateMessage" icon="envelope" label="user.new_private_message"}}
+    {{/if}}
+  {{/unless}}
+
+  {{#mobile-nav class='messages-nav' desktopClass='nav-stacked action-list' currentPath=currentPath}}
     <li class="noGlyph">
       {{#link-to 'userPrivateMessages.index' model}}
         {{i18n 'user.messages.inbox'}}
@@ -20,19 +26,18 @@
     <li>
       {{#link-to 'userPrivateMessages.group' group.name}}
         <i class='glyph fa fa-group'></i>
-        {{capitalize group.name}}
+        {{capitalize-string group.name}}
       {{/link-to}}
     </li>
-    <li>
+    <li class='archive'>
       {{#link-to 'userPrivateMessages.groupArchive' group.name}}
         {{i18n 'user.messages.archive'}}
       {{/link-to}}
     </li>
     {{/if}}
     {{/each}}
-  </ul>
+  {{/mobile-nav}}
 
-  {{d-button class="btn-primary new-private-message" action="composePrivateMessage" icon="envelope" label="user.new_private_message"}}
 </section>
 
 <section class='user-right messages'>
@@ -42,9 +47,15 @@
       <i class="fa fa-list"></i>
     </button>
 
+    {{#if site.mobileView}}
+      {{#if showNewPM}}
+        {{d-button class="btn-primary new-private-message" action="composePrivateMessage" icon="envelope" label="user.new_private_message"}}
+      {{/if}}
+    {{/if}}
+
     {{#if canArchive}}
     <button {{action "archive"}} class="btn btn-archive">
-      {{i18n "user.messages.archive"}}
+      {{i18n "user.messages.move_to_archive"}}
     </button>
     {{/if}}
 

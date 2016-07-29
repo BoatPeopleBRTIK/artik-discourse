@@ -1,4 +1,6 @@
+import { ajax } from 'discourse/lib/ajax';
 import ModalFunctionality from 'discourse/mixins/modal-functionality';
+import { escapeExpression } from 'discourse/lib/utilities';
 
 export default Ember.Controller.extend(ModalFunctionality, {
 
@@ -6,6 +8,12 @@ export default Ember.Controller.extend(ModalFunctionality, {
   submitDisabled: function() {
     return Ember.isEmpty((this.get('accountEmailOrUsername') || '').trim()) || this.get('disabled');
   }.property('accountEmailOrUsername', 'disabled'),
+
+  onShow: function() {
+    if ($.cookie('email')) {
+      this.set('accountEmailOrUsername', $.cookie('email'));
+    }
+  },
 
   actions: {
     submit: function() {
@@ -17,7 +25,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
       var success = function(data) {
         // don't tell people what happened, this keeps it more secure (ensure same on server)
-        var escaped = Discourse.Utilities.escapeExpression(self.get('accountEmailOrUsername'));
+        var escaped = escapeExpression(self.get('accountEmailOrUsername'));
         var isEmail = self.get('accountEmailOrUsername').match(/@/);
 
         var key = 'forgot_password.complete_' + (isEmail ? 'email' : 'username');
@@ -42,7 +50,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
         self.flash(e.responseJSON.errors[0], 'error');
       };
 
-      Discourse.ajax('/session/forgot_password', {
+      ajax('/session/forgot_password', {
         data: { login: this.get('accountEmailOrUsername').trim() },
         type: 'POST'
       }).then(success, fail).finally(function(){

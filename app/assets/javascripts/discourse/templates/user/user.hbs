@@ -1,6 +1,6 @@
 <div class="container{{if viewingSelf ' viewing-self'}}">
   <section class='user-main'>
-    <section {{bind-attr class="collapsedInfo :about model.profileBackground:has-background:no-background"}}  style={{model.profileBackground}}>
+    <section class="{{if collapsedInfo 'collapsed-info'}} about {{if model.profileBackground 'has-background' 'no-background'}}"  style={{model.profileBackground}}>
     {{#unless collapsedInfo}}
     <div class='staff-counters'>
       {{#if model.number_of_flags_given}}
@@ -46,17 +46,20 @@
               {{#if currentUser.staff}}
                 <li><a href={{model.adminPath}} class="btn">{{fa-icon "wrench"}}{{i18n 'admin.user.show_admin_profile'}}</a></li>
               {{/if}}
+              {{plugin-outlet "user-profile-controls" tagName="li"}}
+
               {{#if collapsedInfo}}
               {{#if viewingSelf}}
               <li><a {{action "expandProfile"}} href class="btn">{{fa-icon "angle-double-down"}}{{i18n 'user.expand_profile'}}</a></li>
               {{/if}}
               {{/if}}
+
             </ul>
           </section>
 
           <div class="primary-textual">
-            <h1>{{model.username}} {{user-status model currentUser=currentUser}}</h1>
-            <h2>{{model.name}}</h2>
+            <h1 class="{{if nameFirst "full-name" "username"}}">{{if nameFirst model.name model.username}} {{user-status model currentUser=currentUser}}</h1>
+            <h2 class="{{if nameFirst "username" "full-name"}}">{{#if nameFirst}}{{model.username}}{{else}}{{model.name}}{{/if}}</h2>
             {{#if model.title}}
               <h3>{{model.title}}</h3>
             {{/if}}
@@ -85,14 +88,16 @@
 
             {{#if publicUserFields}}
               <div class="public-user-fields">
-                {{#each uf in publicUserFields}}
+                {{#each publicUserFields as |uf|}}
                   {{#if uf.value}}
-                    <div class="public-user-field">
+                    <div class="public-user-field {{uf.field.dasherized_name}}">
                       <span class="user-field-name">{{uf.field.name}}</span>:
                       <span class="user-field-value">{{uf.value}}</span>
                     </div>
                   {{/if}}
                 {{/each}}
+
+                {{plugin-outlet "user-profile-public-fields"}}
               </div>
             {{/if}}
 
@@ -132,9 +137,9 @@
             </dd>
           {{/if}}
           {{#if model.displayGroups}}
-            <dt>{{i18n 'groups.title' count=model.displayGroups.length}}</dt>
+            <dt class="groups">{{i18n 'groups.title' count=model.displayGroups.length}}</dt>
             <dd class='groups'>
-              {{#each group in model.displayGroups}}
+              {{#each model.displayGroups as |group|}}
                 <span>{{#link-to 'group' group class="group-link"}}{{group.name}}{{/link-to}}</span>
               {{/each}}
             </dd>
@@ -148,13 +153,12 @@
       {{/unless}}
     </section>
 
-    <ul class="nav nav-pills user-nav">
-      <li class='selected'>{{#link-to 'userActivity'}}{{i18n 'user.activity_stream'}}{{/link-to}}</li>
+    {{#mobile-nav class='main-nav' desktopClass="nav nav-pills user-nav" currentPath=currentPath}}
+      <li>{{#link-to 'userActivity'}}{{i18n 'user.activity_stream'}}{{/link-to}}</li>
       {{#if showNotificationsTab}}
         <li>
           {{#link-to 'userNotifications'}}
-            {{fa-icon "comment" class="glyph"}}
-            {{i18n 'user.notifications'}}
+            {{fa-icon "comment" class="glyph"}}{{i18n 'user.notifications'}}
           {{/link-to}}
         </li>
       {{/if}}
@@ -167,12 +171,17 @@
       {{#if showBadges}}
         <li>{{#link-to 'user.badges'}}{{fa-icon "certificate"}}{{i18n 'badges.title'}}{{/link-to}}</li>
       {{/if}}
+      <li>{{#link-to 'user.summary'}}{{i18n 'user.summary.title'}}{{/link-to}}</li>
       {{#if model.can_edit}}
         <li>{{#link-to 'preferences'}}{{fa-icon "cog"}}{{i18n 'user.preferences'}}{{/link-to}}</li>
       {{/if}}
-    </ul>
+    {{/mobile-nav}}
 
-    {{outlet}}
+    <div class='user-table'>
+      <div class='wrapper'>
+        {{outlet}}
+      </div>
+    </div>
 
   </section>
 </div>

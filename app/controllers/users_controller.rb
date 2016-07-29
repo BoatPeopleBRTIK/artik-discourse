@@ -5,9 +5,9 @@ require_dependency 'rate_limiter'
 class UsersController < ApplicationController
 
   skip_before_filter :authorize_mini_profiler, only: [:avatar]
-  skip_before_filter :check_xhr, only: [:show, :password_reset, :update, :account_created, :activate_account, :perform_account_activation, :authorize_email, :user_preferences_redirect, :avatar, :my_redirect, :toggle_anon, :admin_login]
+  skip_before_filter :check_xhr, only: [:show, :password_reset, :update, :account_created, :activate_account, :perform_account_activation, :user_preferences_redirect, :avatar, :my_redirect, :toggle_anon, :admin_login]
 
-  before_filter :ensure_logged_in, only: [:username, :update, :change_email, :user_preferences_redirect, :upload_user_image, :pick_avatar, :destroy_user_image, :destroy, :check_emails]
+  before_filter :ensure_logged_in, only: [:username, :update, :user_preferences_redirect, :upload_user_image, :pick_avatar, :destroy_user_image, :destroy, :check_emails]
   before_filter :respond_to_suspicious_request, only: [:create]
 
   # we need to allow account creation with bad CSRF tokens, if people are caching, the CSRF token on the
@@ -21,7 +21,6 @@ class UsersController < ApplicationController
                                                             :activate_account,
                                                             :perform_account_activation,
                                                             :send_activation_email,
-                                                            :authorize_email,
                                                             :password_reset,
                                                             :confirm_email_token,
                                                             :admin_login]
@@ -166,7 +165,7 @@ class UsersController < ApplicationController
   end
 
   def my_redirect
-    raise Discourse::NotFound if params[:path] !~ /^[a-z\-\/]+$/
+    raise Discourse::NotFound if params[:path] !~ /^[a-z_\-\/]+$/
 
     if current_user.blank?
       cookies[:destination_url] = "/my/#{params[:path]}"
@@ -174,6 +173,13 @@ class UsersController < ApplicationController
     else
       redirect_to(path("/users/#{current_user.username}/#{params[:path]}"))
     end
+  end
+
+  def summary
+    user = fetch_user_from_params
+    summary = UserSummary.new(user, guardian)
+    serializer = UserSummarySerializer.new(summary, scope: guardian)
+    render_json_dump(serializer)
   end
 
   def invited
@@ -205,7 +211,6 @@ class UsersController < ApplicationController
   def is_local_username
     usernames = params[:usernames]
     usernames = [params[:username]] if usernames.blank?
-    usernames.each(&:downcase!)
 
     groups = Group.where(name: usernames).pluck(:name)
     mentionable_groups =
@@ -217,6 +222,7 @@ class UsersController < ApplicationController
       end
 
     usernames -= groups
+    usernames.each(&:downcase!)
 
     result = User.where(staged: false)
                  .where(username_lower: usernames)
@@ -336,7 +342,8 @@ class UsersController < ApplicationController
           errors: user.errors.full_messages.join("\n")
         ),
         errors: user.errors.to_hash,
-        values: user.attributes.slice('name', 'username', 'email')
+        values: user.attributes.slice('name', 'username', 'email'),
+        is_developer: UsernameCheckerService.new.is_developer?(user.email)
       }
     end
   rescue ActiveRecord::StatementInvalid
@@ -424,7 +431,7 @@ class UsersController < ApplicationController
       user = User.where(email: params[:email], admin: true).where.not(id: Discourse::SYSTEM_USER_ID).first
       if user
         email_token = user.email_tokens.create(email: user.email)
-        Jobs.enqueue(:user_email, type: :admin_login, user_id: user.id, email_token: email_token.token)
+        Jobs.enqueue(:critical_user_email, type: :admin_login, user_id: user.id, email_token: email_token.token)
         @message = I18n.t("admin_login.success")
       else
         @message = I18n.t("admin_login.error")
@@ -463,45 +470,8 @@ class UsersController < ApplicationController
     end
   end
 
-  def change_email
-    params.require(:email)
-    user = fetch_user_from_params
-    guardian.ensure_can_edit_email!(user)
-    lower_email = Email.downcase(params[:email]).strip
-
-    RateLimiter.new(user, "change-email-hr-#{request.remote_ip}", 6, 1.hour).performed!
-    RateLimiter.new(user, "change-email-min-#{request.remote_ip}", 3, 1.minute).performed!
-
-    # Raise an error if the email is already in use
-    if User.find_by_email(lower_email)
-      raise Discourse::InvalidParameters.new(:email)
-    end
-
-    email_token = user.email_tokens.create(email: lower_email)
-    Jobs.enqueue(
-      :user_email,
-      to_address: lower_email,
-      type: :authorize_email,
-      user_id: user.id,
-      email_token: email_token.token
-    )
-
-    render nothing: true
-  rescue RateLimiter::LimitExceeded
-    render_json_error(I18n.t("rate_limiter.slow_down"))
-  end
-
-  def authorize_email
-    expires_now()
-    if @user = EmailToken.confirm(params[:token])
-      log_on_user(@user)
-    else
-      flash[:error] = I18n.t('change_email.error')
-    end
-    render layout: 'no_ember'
-  end
-
   def account_created
+    @custom_body_class = "static-account-created"
     @message = session['user_created_message'] || I18n.t('activation.missing_session')
     expires_now
     render layout: 'no_ember'
@@ -547,7 +517,7 @@ class UsersController < ApplicationController
 
   def enqueue_activation_email
     @email_token ||= @user.email_tokens.create(email: @user.email)
-    Jobs.enqueue(:user_email, type: :signup, user_id: @user.id, email_token: @email_token.token)
+    Jobs.enqueue(:critical_user_email, type: :signup, user_id: @user.id, email_token: @email_token.token)
   end
 
   def search_users
@@ -705,8 +675,14 @@ class UsersController < ApplicationController
     end
 
     def user_params
-      params.permit(:name, :email, :password, :username, :active)
-            .merge(ip_address: request.remote_ip, registration_ip_address: request.remote_ip)
+      params.permit(:name, :email, :password, :username, :active, :staged)
+            .merge(ip_address: request.remote_ip,
+                   registration_ip_address: request.remote_ip,
+                   locale: user_locale)
+    end
+
+    def user_locale
+      I18n.locale
     end
 
     def fail_with(key)
