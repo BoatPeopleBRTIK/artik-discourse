@@ -52,7 +52,7 @@ Discourse::Application.configure do
   config.handlebars.precompile = true
 
   # allows developers to use mini profiler
-  config.load_mini_profiler = GlobalSetting.load_mini_profiler
+  config.load_mini_profiler = false # GlobalSetting.load_mini_profiler
 
   # Discourse strongly recommend you use a CDN.
   # For origin pull cdns all you need to do is register an account and configure
