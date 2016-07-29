@@ -1,10 +1,11 @@
+import { ajax } from 'discourse/lib/ajax';
 import AdminUser from 'admin/models/admin-user';
 
 const EmailLog = Discourse.Model.extend({});
 
 EmailLog.reopenClass({
 
-  create: function(attrs) {
+  create(attrs) {
     attrs = attrs || {};
 
     if (attrs.user) {
@@ -14,16 +15,15 @@ EmailLog.reopenClass({
     return this._super(attrs);
   },
 
-  findAll: function(filter) {
+  findAll(filter, offset) {
     filter = filter || {};
-    var status = filter.status || "all";
+    offset = offset || 0;
+
+    const status = filter.status || "sent";
     filter = _.omit(filter, "status");
 
-    return Discourse.ajax("/admin/email/" + status + ".json", { data: filter }).then(function(logs) {
-      return _.map(logs, function (log) {
-        return EmailLog.create(log);
-      });
-    });
+    return ajax(`/admin/email/${status}.json?offset=${offset}`, { data: filter })
+                    .then(logs => _.map(logs, log => EmailLog.create(log)));
   }
 });
 

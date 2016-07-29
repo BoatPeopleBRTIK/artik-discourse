@@ -38,6 +38,7 @@ class PostSerializer < BasicPostSerializer
              :can_edit,
              :can_delete,
              :can_recover,
+             :can_wiki,
              :link_counts,
              :read,
              :user_title,
@@ -62,7 +63,9 @@ class PostSerializer < BasicPostSerializer
              :user_custom_fields,
              :static_doc,
              :via_email,
-             :action_code
+             :is_auto_generated,
+             :action_code,
+             :action_code_who
 
   def initialize(object, opts)
     super(object, opts)
@@ -127,6 +130,10 @@ class PostSerializer < BasicPostSerializer
 
   def can_recover
     scope.can_recover_post?(object)
+  end
+
+  def can_wiki
+    scope.can_wiki?(object)
   end
 
   def display_username
@@ -305,12 +312,28 @@ class PostSerializer < BasicPostSerializer
     object.via_email?
   end
 
+  def is_auto_generated
+    object.incoming_email.try(:is_auto_generated)
+  end
+
+  def include_is_auto_generated?
+    object.via_email? && is_auto_generated
+  end
+
   def version
     scope.is_staff? ? object.version : object.public_version
   end
 
   def include_action_code?
     object.action_code.present?
+  end
+
+  def action_code_who
+    post_custom_fields["action_code_who"]
+  end
+
+  def include_action_code_who?
+    include_action_code? && action_code_who.present?
   end
 
   private

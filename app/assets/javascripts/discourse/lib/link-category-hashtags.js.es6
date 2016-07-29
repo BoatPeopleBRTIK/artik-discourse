@@ -1,11 +1,10 @@
+import { ajax } from 'discourse/lib/ajax';
+import { replaceSpan } from 'discourse/lib/category-hashtags';
+
 const validCategoryHashtags = {};
 const checkedCategoryHashtags = [];
 const testedKey = 'tested';
 const testedClass = `hashtag-${testedKey}`;
-
-function replaceSpan($elem, categorySlug, categoryLink) {
-  $elem.replaceWith(`<a href="${categoryLink}" class="hashtag">#${categorySlug}</a>`);
-}
 
 function updateFound($hashtags, categorySlugs) {
   Ember.run.schedule('afterRender', () => {
@@ -43,7 +42,7 @@ export function linkSeenCategoryHashtags($elem) {
 };
 
 export function fetchUnseenCategoryHashtags(categorySlugs) {
-  return Discourse.ajax("/category_hashtags/check", { data: { category_slugs: categorySlugs } })
+  return ajax("/category_hashtags/check", { data: { category_slugs: categorySlugs } })
     .then((response) => {
       response.valid.forEach((category) => {
         validCategoryHashtags[category.slug] = category.url;

@@ -1,3 +1,4 @@
+import { ajax } from 'discourse/lib/ajax';
 import RestModel from 'discourse/models/rest';
 import { on } from 'ember-addons/ember-computed-decorators';
 import PermissionType from 'discourse/models/permission-type';
@@ -67,7 +68,7 @@ const Category = RestModel.extend({
       url = "/categories/" + this.get('id');
     }
 
-    return Discourse.ajax(url, {
+    return ajax(url, {
       data: {
         name: this.get('name'),
         slug: this.get('slug'),
@@ -87,7 +88,8 @@ const Category = RestModel.extend({
         custom_fields: this.get('custom_fields'),
         topic_template: this.get('topic_template'),
         suppress_from_homepage: this.get('suppress_from_homepage'),
-        contains_messages: this.get("contains_messages"),
+        allowed_tags: this.get('allowed_tags'),
+        allowed_tag_groups: this.get('allowed_tag_groups')
       },
       type: this.get('id') ? 'PUT' : 'POST'
     });
@@ -102,7 +104,7 @@ const Category = RestModel.extend({
   }.property("permissions"),
 
   destroy: function() {
-    return Discourse.ajax("/categories/" + (this.get('id') || this.get('slug')), { type: 'DELETE' });
+    return ajax("/categories/" + (this.get('id') || this.get('slug')), { type: 'DELETE' });
   },
 
   addPermission: function(permission){
@@ -169,7 +171,7 @@ const Category = RestModel.extend({
   setNotification: function(notification_level) {
     var url = "/category/" + this.get('id')+"/notifications";
     this.set('notification_level', notification_level);
-    return Discourse.ajax(url, {
+    return ajax(url, {
       data: {
         notification_level: notification_level
       },
@@ -205,14 +207,14 @@ Category.reopenClass({
     return _uncategorized;
   },
 
-  slugFor(category) {
+  slugFor(category, separator = "/") {
     if (!category) return "";
 
     const parentCategory = Em.get(category, 'parentCategory');
     let result = "";
 
     if (parentCategory) {
-      result = Category.slugFor(parentCategory) + "/";
+      result = Category.slugFor(parentCategory) + separator;
     }
 
     const id = Em.get(category, 'id'),
@@ -284,7 +286,11 @@ Category.reopenClass({
   },
 
   reloadById(id) {
-    return Discourse.ajax(`/c/${id}/show.json`);
+    return ajax(`/c/${id}/show.json`);
+  },
+
+  reloadBySlug(slug, parentSlug) {
+    return parentSlug ? ajax(`/c/${parentSlug}/${slug}/find_by_slug.json`) : ajax(`/c/${slug}/find_by_slug.json`);
   },
 
   search(term, opts) {
@@ -299,11 +305,18 @@ Category.reopenClass({
     }
 
     const emptyTerm = (term === "");
+    let slugTerm = term;
+
+    if (!emptyTerm) {
+      term = term.toLowerCase();
+      slugTerm = term;
+      term = term.replace(/-/g, " ");
+    }
+
     const categories = Category.listByActivity();
     const length = categories.length;
     var i;
     var data = [];
-    term = term.toLowerCase();
 
     const done = () => {
       return data.length === limit;
@@ -311,8 +324,11 @@ Category.reopenClass({
 
     for (i = 0; i < length && !done(); i++) {
       const category = categories[i];
-      if ((emptyTerm) ||
-          (!emptyTerm && category.get('name').toLowerCase().indexOf(term) === 0)) {
+      if ((emptyTerm && !category.get('parent_category_id')) ||
+          (!emptyTerm &&
+           (category.get('name').toLowerCase().indexOf(term) === 0 ||
+            category.get('slug').toLowerCase().indexOf(slugTerm) === 0))) {
+
         data.push(category);
       }
     }
@@ -321,7 +337,10 @@ Category.reopenClass({
       for (i = 0; i < length && !done(); i++) {
         const category = categories[i];
 
-        if ((!emptyTerm && category.get('name').toLowerCase().indexOf(term) > 0)) {
+        if (!emptyTerm &&
+            (category.get('name').toLowerCase().indexOf(term) > 0 ||
+             category.get('slug').toLowerCase().indexOf(slugTerm) > 0)) {
+
           if (data.indexOf(category) === -1) data.push(category);
         }
       }

@@ -42,6 +42,7 @@ class Group < ActiveRecord::Base
   }
 
   AUTO_GROUP_IDS = Hash[*AUTO_GROUPS.to_a.flatten.reverse]
+  STAFF_GROUPS = [:admins, :moderators, :staff]
 
   ALIAS_LEVELS = {
     :nobody => 0,
@@ -81,8 +82,16 @@ class Group < ActiveRecord::Base
 
   def incoming_email_validator
     return if self.automatic || self.incoming_email.blank?
-    unless Email.is_valid?(incoming_email)
-      self.errors.add(:base, I18n.t('groups.errors.invalid_incoming_email', incoming_email: incoming_email))
+
+    incoming_email.split("|").each do |email|
+      escaped = Rack::Utils.escape_html(email)
+      if !Email.is_valid?(email)
+        self.errors.add(:base, I18n.t('groups.errors.invalid_incoming_email', email: escaped))
+      elsif group = Group.where.not(id: self.id).find_by_email(email)
+        self.errors.add(:base, I18n.t('groups.errors.email_already_used_in_group', email: escaped, group_name: Rack::Utils.escape_html(group.name)))
+      elsif category = Category.find_by_email(email)
+        self.errors.add(:base, I18n.t('groups.errors.email_already_used_in_category', email: escaped, category_name: Rack::Utils.escape_html(category.name)))
+      end
     end
   end
 
@@ -210,6 +219,17 @@ class Group < ActiveRecord::Base
     group
   end
 
+  def self.ensure_consistency!
+    reset_all_counters!
+    refresh_automatic_groups!
+  end
+
+  def self.reset_all_counters!
+    Group.pluck(:id).each do |group_id|
+      Group.reset_counters(group_id, :group_users)
+    end
+  end
+
   def self.refresh_automatic_groups!(*args)
     if args.length == 0
       args = AUTO_GROUPS.keys
@@ -332,7 +352,40 @@ class Group < ActiveRecord::Base
   end
 
   def self.find_by_email(email)
-    self.find_by(incoming_email: Email.downcase(email))
+    self.where("string_to_array(incoming_email, '|') @> ARRAY[?]", Email.downcase(email)).first
+  end
+
+  def bulk_add(user_ids)
+    if user_ids.present?
+      Group.exec_sql("INSERT INTO group_users
+                                  (group_id, user_id, created_at, updated_at)
+                     SELECT #{self.id},
+                            u.id,
+                            CURRENT_TIMESTAMP,
+                            CURRENT_TIMESTAMP
+                     FROM users AS u
+                     WHERE u.id IN (#{user_ids.join(', ')})
+                       AND NOT EXISTS(SELECT 1 FROM group_users AS gu
+                                      WHERE gu.user_id = u.id AND
+                                            gu.group_id = #{self.id})")
+
+      if self.primary_group?
+        User.where(id: user_ids).update_all(primary_group_id: self.id)
+      end
+
+      if self.title.present?
+        User.where(id: user_ids).update_all(title: self.title)
+      end
+    end
+    true
+  end
+
+  def mentionable?(user, group_id)
+    Group.mentionable(user).where(id: group_id).exists?
+  end
+
+  def staff?
+    STAFF_GROUPS.include?(self.name.to_sym)
   end
 
   protected
@@ -348,7 +401,7 @@ class Group < ActiveRecord::Base
       domains.each do |domain|
         domain.sub!(/^https?:\/\//, '')
         domain.sub!(/\/.*$/, '')
-        self.errors.add :base, (I18n.t('groups.errors.invalid_domain', domain: domain)) unless domain =~ /\A[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*)?\Z/i
+        self.errors.add :base, (I18n.t('groups.errors.invalid_domain', domain: domain)) unless domain =~ /\A[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,24}(:[0-9]{1,5})?(\/.*)?\Z/i
       end
       self.automatic_membership_email_domains = domains.join("|")
     end
@@ -430,7 +483,7 @@ end
 # Table name: groups
 #
 #  id                                 :integer          not null, primary key
-#  name                               :string(255)      not null
+#  name                               :string           not null
 #  created_at                         :datetime         not null
 #  updated_at                         :datetime         not null
 #  automatic                          :boolean          default(FALSE), not null
@@ -440,10 +493,13 @@ end
 #  automatic_membership_email_domains :text
 #  automatic_membership_retroactive   :boolean          default(FALSE)
 #  primary_group                      :boolean          default(FALSE), not null
-#  title                              :string(255)
+#  title                              :string
 #  grant_trust_level                  :integer
+#  incoming_email                     :string
+#  has_messages                       :boolean          default(FALSE), not null
 #
 # Indexes
 #
-#  index_groups_on_name  (name) UNIQUE
+#  index_groups_on_incoming_email  (incoming_email) UNIQUE
+#  index_groups_on_name            (name) UNIQUE
 #
