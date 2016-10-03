@@ -23,16 +23,29 @@ class Tag < ActiveRecord::Base
                              .where("topics.category_id = ?", category.id)
   end
 
-  def self.top_tags(limit_arg: nil, category: nil)
+  def self.top_tags(limit_arg: nil, category: nil, guardian: nil)
     limit = limit_arg || SiteSetting.max_tags_in_filter_list
+    scope_category_ids = (guardian||Guardian.new).allowed_category_ids
 
-    tags = DiscourseTagging.filter_allowed_tags(tags_by_count_query(limit: limit), nil, category: category)
+    if category
+      scope_category_ids &= ([category.id] + category.subcategories.pluck(:id))
+    end
+
+    tags = DiscourseTagging.filter_allowed_tags(
+      tags_by_count_query(limit: limit).where("topics.category_id in (?)", scope_category_ids),
+      nil, # Don't pass guardian. You might not be able to use some tags, but should still be able to see where they've been used.
+      category: category
+    )
 
     tags.count.map {|name, _| name}
   end
 
   def self.include_tags?
     SiteSetting.tagging_enabled && SiteSetting.show_filter_by_tag
+  end
+
+  def full_url
+    "#{Discourse.base_url}/tags/#{self.name}"
   end
 end
 

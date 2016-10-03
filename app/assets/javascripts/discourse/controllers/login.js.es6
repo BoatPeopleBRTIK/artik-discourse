@@ -3,6 +3,7 @@ import ModalFunctionality from 'discourse/mixins/modal-functionality';
 import showModal from 'discourse/lib/show-modal';
 import { setting } from 'discourse/lib/computed';
 import { findAll } from 'discourse/models/login-method';
+import { escape } from 'pretty-text/sanitizer';
 
 // This is happening outside of the app via popup
 const AuthErrors =
@@ -63,11 +64,11 @@ export default Ember.Controller.extend(ModalFunctionality, {
         // Successful login
         if (result.error) {
           self.set('loggingIn', false);
-          if( result.reason === 'not_activated' ) {
+          if (result.reason === 'not_activated') {
             self.send('showNotActivated', {
               username: self.get('loginName'),
-              sentTo: result.sent_to_email,
-              currentEmail: result.current_email
+              sentTo: escape(result.sent_to_email),
+              currentEmail: escape(result.current_email)
             });
           } else if (result.reason === 'suspended' ) {
             self.send("closeModal");
@@ -129,8 +130,9 @@ export default Ember.Controller.extend(ModalFunctionality, {
       if(customLogin){
         customLogin();
       } else {
-        const authUrl = loginMethod.get('customUrl') || Discourse.getURL("/auth/" + name);
+        let authUrl = loginMethod.get('customUrl') || Discourse.getURL("/auth/" + name);
         if (loginMethod.get("fullScreenLogin")) {
+          document.cookie = "fsl=true";
           window.location = authUrl;
         } else {
           this.set('authenticate', name);
@@ -139,6 +141,11 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
           const height = loginMethod.get("frameHeight") || 400;
           const width = loginMethod.get("frameWidth") || 800;
+
+          if (loginMethod.get("displayPopup")) {
+            authUrl = authUrl + "?display=popup";
+          }
+
           const w = window.open(authUrl, "_blank",
               "menubar=no,status=no,height=" + height + ",width=" + width +  ",left=" + left + ",top=" + top);
           const self = this;
@@ -175,7 +182,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
   authMessage: (function() {
     if (Ember.isEmpty(this.get('authenticate'))) return "";
-    const method = findAll(this.siteSettings).findProperty("name", this.get("authenticate"));
+    const method = findAll(this.siteSettings, this.capabilities, this.isMobileDevice).findProperty("name", this.get("authenticate"));
     if(method){
       return method.get('message');
     }

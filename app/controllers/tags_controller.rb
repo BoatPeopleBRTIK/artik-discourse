@@ -44,6 +44,7 @@ class TagsController < ::ApplicationController
   Discourse.filters.each do |filter|
     define_method("show_#{filter}") do
       @tag_id = DiscourseTagging.clean_tag(params[:tag_id])
+      @additional_tags = params[:additional_tag_ids].to_s.split('/').map { |tag| DiscourseTagging.clean_tag(tag) }
 
       page = params[:page].to_i
       list_opts = build_topic_list_options
@@ -71,7 +72,7 @@ class TagsController < ::ApplicationController
       @list.more_topics_url = construct_url_with(:next, list_opts)
       @list.prev_topics_url = construct_url_with(:prev, list_opts)
       @rss = "tag"
-      @description_meta = I18n.t("rss_by_tag", tag: @tag_id)
+      @description_meta = I18n.t("rss_by_tag", tag: tag_params.join(' & '))
       @title = @description_meta
 
       canonical_url "#{Discourse.base_url_no_prefix}#{public_send(url_method(params.slice(:category, :parent_category)))}"
@@ -156,7 +157,15 @@ class TagsController < ::ApplicationController
       tags << { id: t.name, text: t.name, count: 0 }
     end
 
-    render json: { results: tags }
+    json_response = { results: tags }
+
+    t = DiscourseTagging.clean_tag(params[:q])
+    if Tag.where(name: t).exists? && !tags.find { |h| h[:id] == t }
+      # filter_allowed_tags determined that the tag entered is not allowed
+      json_response[:forbidden] = t
+    end
+
+    render json: json_response
   end
 
   def notifications
@@ -177,8 +186,8 @@ class TagsController < ::ApplicationController
   def check_hashtag
     tag_values = params[:tag_values].each(&:downcase!)
 
-    valid_tags = TopicCustomField.where(name: DiscourseTagging::TAGS_FIELD_NAME, value: tag_values).map do |tag|
-      { value: tag.value, url: "#{Discourse.base_url}/tags/#{tag.value}" }
+    valid_tags = Tag.where(name: tag_values).map do |tag|
+      { value: tag.name, url: tag.full_url }
     end.compact
 
     render json: { valid: valid_tags }
@@ -289,7 +298,8 @@ class TagsController < ::ApplicationController
       if params[:tag_id] == 'none'
         options[:no_tags] = true
       else
-        options[:tags] = [params[:tag_id]]
+        options[:tags] = tag_params
+        options[:match_all_tags] = true
       end
 
       options
@@ -306,5 +316,9 @@ class TagsController < ::ApplicationController
         # redirect to 404
         raise Discourse::NotFound
       end
+    end
+
+    def tag_params
+      [@tag_id].concat(Array(@additional_tags))
     end
 end

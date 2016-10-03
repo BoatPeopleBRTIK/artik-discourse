@@ -63,6 +63,8 @@ class ImportScripts::Mbox < ImportScripts::Base
 
     files.flatten!
 
+    files.sort!
+
     files.each_with_index do |f, idx|
       if SPLIT_AT.present?
         msg = ""
@@ -100,7 +102,7 @@ class ImportScripts::Mbox < ImportScripts::Base
     db = open_db
     db.execute "UPDATE emails SET reply_to = null WHERE reply_to = ''"
 
-    rows = db.execute "SELECT msg_id, title, reply_to FROM emails ORDER BY email_date ASC"
+    rows = db.execute "SELECT msg_id, title, reply_to FROM emails ORDER BY datetime(email_date) ASC"
 
     msg_ids = {}
     titles = {}
@@ -199,6 +201,7 @@ class ImportScripts::Mbox < ImportScripts::Base
       title = clean_title(mail['Subject'].to_s)
       reply_to = mail['In-Reply-To'].to_s
       email_date = mail['date'].to_s
+      email_date = DateTime.parse(email_date).to_s unless email_date.blank?
 
       db.execute "INSERT OR IGNORE INTO emails (msg_id,
                                                 from_email,
@@ -309,7 +312,8 @@ class ImportScripts::Mbox < ImportScripts::Base
                                     message,
                                     category
                             FROM emails
-                            WHERE reply_to IS NULL")
+                            WHERE reply_to IS NULL
+                            ORDER BY DATE(email_date)")
 
     topic_count = all_topics.size
 
@@ -375,7 +379,9 @@ class ImportScripts::Mbox < ImportScripts::Base
                                  message,
                                  reply_to
                           FROM emails
-                          WHERE reply_to IS NOT NULL")
+                          WHERE reply_to IS NOT NULL
+                          ORDER BY DATE(email_date)
+                          ")
 
     post_count = replies.size
 
