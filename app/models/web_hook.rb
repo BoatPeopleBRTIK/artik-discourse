@@ -41,7 +41,7 @@ class WebHook < ActiveRecord::Base
   end
 
   def self.enqueue_topic_hooks(event, topic, user)
-    WebHook.enqueue_hooks(:topic, topic_id: topic.id, user_id: user&.id, category_id: topic&.category&.id, event_name: event.to_s)
+    WebHook.enqueue_hooks(:topic, topic_id: topic.id, user_id: user.id, category_id: topic.category.id, event_name: event.to_s)
   end
 
   %i(topic_destroyed topic_recovered).each do |event|
@@ -61,9 +61,9 @@ class WebHook < ActiveRecord::Base
     DiscourseEvent.on(event) do |post, _, user|
       WebHook.enqueue_hooks(:post,
         post_id: post.id,
-        topic_id: post&.topic&.id,
-        user_id: user&.id,
-        category_id: post.topic&.category&.id,
+        topic_id: post.topic.id,
+        user_id: user.id,
+        category_id: post.topic.category.id,
         event_name: event.to_s
       )
     end
