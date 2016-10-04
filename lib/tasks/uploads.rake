@@ -623,7 +623,7 @@ task "uploads:analyze", [:cache_path, :limit] => :environment do |_, args|
 
   limit = args[:limit] || 10
 
-  sql = <<~SQL
+  sql = %q{
     SELECT
       users.username,
       COUNT(uploads.user_id) AS num_of_uploads,
@@ -635,7 +635,7 @@ task "uploads:analyze", [:cache_path, :limit] => :environment do |_, args|
     GROUP BY users.id
     ORDER BY total_size_of_uploads DESC
     LIMIT #{limit}
-  SQL
+  }
 
   puts "Users using the most disk space"
   puts "-------------------------------\n"
