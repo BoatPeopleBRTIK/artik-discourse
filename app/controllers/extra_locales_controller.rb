@@ -17,14 +17,14 @@ class ExtraLocalesController < ApplicationController
         for_key.deep_merge!(plugin_for_key)
       end
 
-      js = <<~JS
+      js = %{
       (function() {
         if (window.I18n) {
           window.I18n.extras = window.I18n.extras || [];
           window.I18n.extras.push(#{for_key.to_json});
         }
       })();
-      JS
+      }
     end
 
     render text: js, content_type: "application/javascript"
